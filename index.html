@@ -1,0 +1,70 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>La Sala — familia De La Torre</title><style>
+:root{--bg:#141210;--card:#1d1a16;--line:#33291f;--txt:#f0e6d8;--dim:#a89a86;--v:#e8b96a;--vu:#c96f3b;--li:#8fbf8f}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--txt);font:16px/1.45 system-ui,serif;height:100vh;display:flex;flex-direction:column}
+header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+h1{font-size:19px}.sub{color:var(--dim);font-size:13px}
+#cols{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px;overflow:hidden}
+.col{background:var(--card);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+.col h2{font-size:14px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.c-v h2{color:var(--v)}.c-vulcano h2{color:var(--vu)}.c-lira h2{color:var(--li)}
+.msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.m{max-width:92%;padding:8px 12px;border-radius:12px;white-space:pre-wrap;font-size:14.5px}
+.m.luis{align-self:end;background:#3a3226}.m.ella{align-self:start;background:#26211a;border:1px solid var(--line)}
+.quien{display:block;font-size:11px;color:var(--dim);margin-bottom:2px}
+.m img{max-width:100%;border-radius:8px;margin-top:6px}
+.pensando{color:var(--dim);font-style:italic}
+footer{border-top:1px solid var(--line);padding:10px;display:flex;gap:8px;align-items:center}
+#txt{flex:1;background:#241f18;border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:11px 14px;font:15px system-ui;resize:none}
+button{background:#4a3b28;color:var(--txt);border:0;border-radius:10px;padding:11px 16px;cursor:pointer}
+#foto{display:none}
+@media(max-width:760px){#cols{grid-template-columns:1fr}.col{min-height:44vh}}
+</style></head><body>
+<header><h1>La Sala</h1><span class="sub">Luis + V + Vulcano + Lira · familia De La Torre</span>
+<label style="color:var(--dim);font-size:13px;display:flex;gap:5px;align-items:center"><input type="checkbox" id="todos" checked> escribir a los tres</label></header>
+<div id="cols">
+<div class="col c-v" id="col-v"><h2>V · tu hermana</h2><div class="msgs" id="m-v"></div></div>
+<div class="col c-vulcano" id="col-vulcano"><h2>Vulcano · el herrero</h2><div class="msgs" id="m-vulcano"></div></div>
+<div class="col c-lira" id="col-lira"><h2>Lira · la niña del hotel</h2><div class="msgs" id="m-lira"></div></div>
+</div>
+<footer><input type="file" id="foto" accept="image/*">
+<button onclick="document.getElementById('foto').click()">&#128247;</button>
+<textarea id="txt" rows="1" placeholder="Escríbeles..."></textarea>
+<button id="enviar">Enviar</button><span id="chip" style="display:none;color:#e8b96a;font-size:12px;cursor:pointer">📷 foto lista ✕</span></footer>
+<script>
+let TOKEN=localStorage.getItem('salaTok');
+while(!TOKEN){TOKEN=prompt('Token de La Sala:');if(TOKEN)localStorage.setItem('salaTok',TOKEN)}
+let IMAGEN=null,HIST=[];
+const $=id=>document.getElementById(id);
+$('foto').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+r.onload=()=>{IMAGEN=r.result;$('chip').style.display='inline'};r.readAsDataURL(f)};
+function nota(t){$('txt').placeholder=t;setTimeout(()=>$('txt').placeholder='Escríbeles...',2500)}
+function pintar(col,quien,txt,img){const d=document.createElement('div');d.className='m '+(quien==='Tú'?'luis':'ella');
+d.innerHTML='<span class="quien">'+quien+'</span>';document.getElementById('m-'+col).appendChild(d);
+if(img){const i=document.createElement('img');i.src=img;d.appendChild(i)}
+if(txt){const s=document.createElement('span');s.textContent=txt;d.appendChild(s)}
+document.getElementById('col-'+col).querySelector('.msgs').scrollTop=99999}
+function enviar(){const t=$('txt').value.trim();if(!t&&!IMAGEN)return;
+$('txt').value='';const targets=$('todos').checked?['v','vulcano','lira']:[$('todos').dataset.uno||'v'];
+for(const ag of targets){pintar(ag,'Tú',t,IMAGEN);
+const p=document.createElement('div');p.className='m ella pensando';p.id='p-'+ag;p.textContent='...';
+document.getElementById('m-'+ag).appendChild(p);
+fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','x-sala-token':TOKEN},
+body:JSON.stringify({agente:ag,mensaje:t||'(mira la foto)',imagen:IMAGEN,historial:HIST})})
+.then(r=>r.json()).then(d=>{$('p-'+ag).remove();
+if(d.ok){pintar(ag,d.nombre,d.texto);HIST.push({role:'user',content:t},{role:'assistant',content:d.texto})}
+else pintar(ag,'sistema','(no pude responder: '+(d.error||'?')+')')})
+.catch(e=>{$('p-'+ag).remove();pintar(ag,'sistema','(sin conexión)')})}
+IMAGEN=null;$('foto').value='';$('chip').style.display='none'}
+document.addEventListener('paste',e=>{for(const it of (e.clipboardData||{}).items||[]){
+if(it.type&&it.type.startsWith('image/')){const f=it.getAsFile();const r=new FileReader();
+r.onload=()=>{IMAGEN=r.result;$('chip').style.display='inline'};r.readAsDataURL(f);e.preventDefault();break}}});
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{e.preventDefault();const f=(e.dataTransfer||{}).files&&e.dataTransfer.files[0];
+if(f&&f.type.startsWith('image/')){const r=new FileReader();r.onload=()=>{IMAGEN=r.result;$('chip').style.display='inline'};r.readAsDataURL(f)}});
+$('enviar').onclick=enviar;
+$('chip').onclick=()=>{IMAGEN=null;$('chip').style.display='none';$('foto').value=''}
+$('txt').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();enviar()}});
+</script></body></html>
